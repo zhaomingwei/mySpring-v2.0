@@ -1,0 +1,40 @@
+BeanDefinition：存储配置文件中的信息，存放于内存中
+主要方法：setBeanClassName,getBeanClassName,set/getFactoryBeanName,
+setLazyInit,isLazyInit等等
+属性：beanClassName,factoryBeanName...
+BeanDefinitionReader：读取配置文件到BeanDefinition中
+BeanWrapper：BeanDefinition包装类
+BeanFactory接口：最顶层接口，管理bean的工厂
+BeanPostProcessor：用于做事件监听
+
+
+1、ClassPathXmlApplicationContext 继承 BeanFactory 接口（主要方法：getBean(String name)）
+setConfigLocations()：获取Bean资源文件定义路径
+构造方法传入资源路径数组，调用refresh()(bean定位、加载、注册、依赖注入等)
+
+定位：
+BeanDefinitionReader:构造方法中用流读取到Properties变量中,
+然后doScanner读取Properties里所有class到一个List中
+
+加载：
+loadBeanDefinitions方法返回此列表;
+
+注册：
+doRegister将BeanDefinitions注册到beanDefinitionsMap中
+循环加载得到的列表开始注册：注册分为三种：1、默认是类名首字母小写
+2、自定义名字  3、自动注入
+通过类名获取类，如果是接口使用实现类注册，不是则通过
+registerBean方法注册（每解析一个class把它包装成BeanDefinition对象）
+在获取class的所有接口，遍历放入beanDefinitionMap中，
+
+依赖注入：
+getBean开始，读取BeanDefinition中的信息然后通过反射机制创建一个实例返回
+Spring中是不会把最原始的对象返回，会用一个BeanWrapper来进行一次包装
+装饰者模式：1、保留原来的OOP关系 2、需要对其进行扩展，增强（为AOP打基础）
+注册式单例：传入一个BeanDefinition返回一个实例Bean，然后包装成BeanWrapper（Spring
+中该类是一个接口，会有一个实现类，此处为简单则直接把此类当做实现类来做）
+通过BeanPostProcessor在实例化以前和以后调用一次（监听事件）
+
+开始真正的依赖注入（populate方法）：判断字段有没有加自定义注解，有则把实例赋值
+
+2、DispatcherServlet extents HttpServlet

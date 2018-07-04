@@ -1,10 +1,16 @@
 package com.zw.springframework.context;
 
+import com.zw.springframework.annotation.Autowired;
+import com.zw.springframework.annotation.Controller;
+import com.zw.springframework.annotation.Service;
 import com.zw.springframework.beans.BeanDefinition;
+import com.zw.springframework.beans.BeanWrapper;
 import com.zw.springframework.context.support.BeanDefinitionReader;
 import com.zw.springframework.core.BeanFactory;
 import com.zw.springframework.util.Assert;
 
+import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,7 +24,13 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
     private BeanDefinitionReader reader;
 
     //存储所有被代理过的对象
-    private Map beanDefinitionMap = new ConcurrentHashMap();
+    private Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap();
+
+    //用来保证注册式单例的容器
+    private Map<String, Object> beanCacheMap = new HashMap<String, Object>();
+
+    //用来存储所有被代理过的对象
+    private Map<String, BeanWrapper> beanWrapperMap = new ConcurrentHashMap<String, BeanWrapper>();
 
     //单个文件构造函数，把单个文件放在数组里在调用参数为一个数组的构造函数
     public ClassPathXmlApplicationContext(String location){
@@ -46,10 +58,52 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
 
 
 
-
     }
 
     private void doAutowired() {
+
+        for(Map.Entry<String, BeanDefinition> beanDefinitionEntry:this.beanDefinitionMap.entrySet()){
+            if(!beanDefinitionEntry.getValue().isLazyInit()){
+                String beanName = beanDefinitionEntry.getKey();
+                Object obj = getBean(beanName);
+            }
+        }
+
+        for(Map.Entry<String, BeanWrapper> beanWrapperEntry:beanWrapperMap.entrySet()){
+            populateBean(beanWrapperEntry.getKey(), beanWrapperEntry.getValue().getOriginalInstance());
+        }
+
+    }
+
+    //开始真正的注入
+    private void populateBean(String key, Object originalInstance) {
+        Class clazz = originalInstance.getClass();
+
+        if(!clazz.isAnnotationPresent(Controller.class) ||
+                clazz.isAnnotationPresent(Service.class)){
+            return;
+        }
+        Field[] fields = clazz.getDeclaredFields();
+        for(Field field:fields){
+            if(!field.isAnnotationPresent(Autowired.class)){
+                continue;
+            }
+            Autowired autowired = field.getAnnotation(Autowired.class);
+
+            String autowiredBeanName = autowired.value().trim();
+
+            if("".endsWith(autowiredBeanName)){
+                autowiredBeanName = field.getType().getName();
+            }
+
+            field.setAccessible(true);
+
+            try{
+                field.set(originalInstance, beanWrapperMap.get(autowiredBeanName).getWrapperInstance());
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
     }
 
     //真正的将BeanDefinitions注册到beanDefinitionMap中
@@ -112,7 +166,39 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
 
     }
 
-    public Object getBean(String baneName) {
+    public Object getBean(String beanName) {
+        BeanDefinition beanDefinition = this.beanDefinitionMap.get(beanName);
+        String className = beanDefinition.getBeanClassName();
+        try{
+            Object instance = instantionBean(beanDefinition);
+            if(null==instance){
+                return null;
+            }
+            BeanWrapper beanWrapper = new BeanWrapper(instance);
+            beanWrapperMap.put(className, beanWrapper);
+            //返回的这个WrapperInstance是我们通过动态代理后的对象
+            return beanWrapperMap.get(className).getWrapperInstance();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private Object instantionBean(BeanDefinition beanDefinition) {
+        Object instance = null;
+        String className = beanDefinition.getBeanClassName();
+        try{
+            if(beanCacheMap.containsKey(className)){
+                instance = beanCacheMap.get(className);
+            }else{
+                Class<?> clazz = Class.forName(className);
+                instance = clazz.newInstance();
+                beanCacheMap.put(className, instance);
+            }
+            return instance;
+        }catch (Exception e){
+            e.printStackTrace();
+        }
         return null;
     }
 }

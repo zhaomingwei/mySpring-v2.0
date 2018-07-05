@@ -77,30 +77,40 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
 
     //开始真正的注入
     private void populateBean(String key, Object originalInstance) {
+        //根据传入的对象获取它的class
         Class clazz = originalInstance.getClass();
-
-        if(!clazz.isAnnotationPresent(Controller.class) ||
-                clazz.isAnnotationPresent(Service.class)){
+        //如果这个class没有Controller、Service注解则返回
+        if(!clazz.isAnnotationPresent(Controller.class)
+                || !clazz.isAnnotationPresent(Service.class)){
             return;
         }
+        //获取这个类所有的字段(不管访问权限)
         Field[] fields = clazz.getDeclaredFields();
+        if(fields.length==0){
+            return;
+        }
+        //遍历所有字段
         for(Field field:fields){
+            //不是Autowired的注解则进行下一个
             if(!field.isAnnotationPresent(Autowired.class)){
-                continue;
+                return;
             }
+            //获取Autowired注解信息
             Autowired autowired = field.getAnnotation(Autowired.class);
-
-            String autowiredBeanName = autowired.value().trim();
-
-            if("".endsWith(autowiredBeanName)){
-                autowiredBeanName = field.getType().getName();
+            //获取注解想要注入的类型的名称
+            String autowiredName = autowired.value().trim();
+            if("".endsWith(autowiredName)){
+                //如果注解想要注入的类型的名称为空则获取定义该字段的类型名称
+                autowiredName = field.getType().getName();
             }
-
+            //强制设置所有字段可访问,包括private等
             field.setAccessible(true);
-
-            try{
-                field.set(originalInstance, beanWrapperMap.get(autowiredBeanName).getWrapperInstance());
-            }catch (Exception e){
+            try {
+                //开始注入，给当前有注解的字段赋值
+                //从beanWrapperMap中拿出key为autowiredName的BeanWrapper包装类
+                //赋值给该字段
+                field.set(originalInstance, this.beanWrapperMap.get(autowiredName).getWrapperInstance());
+            } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
         }

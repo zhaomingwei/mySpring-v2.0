@@ -211,4 +211,10 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
         }
         return null;
     }
+
+    public String[] getBeanDefinitionNames(){
+        return this.beanDefinitionMap.keySet().toArray(new String[this.beanDefinitionMap.size()]);
+    }
+
+
 }

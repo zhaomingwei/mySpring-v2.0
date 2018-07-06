@@ -13,6 +13,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ClassPathXmlApplicationContext extends AbstractApplicationContext implements BeanFactory {
@@ -81,7 +82,7 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
         Class clazz = originalInstance.getClass();
         //如果这个class没有Controller、Service注解则返回
         if(!clazz.isAnnotationPresent(Controller.class)
-                || !clazz.isAnnotationPresent(Service.class)){
+                && !clazz.isAnnotationPresent(Service.class)){
             return;
         }
         //获取这个类所有的字段(不管访问权限)
@@ -214,6 +215,10 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
 
     public String[] getBeanDefinitionNames(){
         return this.beanDefinitionMap.keySet().toArray(new String[this.beanDefinitionMap.size()]);
+    }
+
+    public Properties getConfig(){
+        return this.reader.getConfig();
     }
 
 

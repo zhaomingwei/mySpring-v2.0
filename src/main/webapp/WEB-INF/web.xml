@@ -8,7 +8,7 @@
         <servlet-name>mvc</servlet-name>
         <servlet-class>com.zw.springframework.webmvc.servlet.DispatcherServlet</servlet-class>
         <init-param>
-            <param-name>configContext</param-name>
+            <param-name>contextConfigLocation</param-name>
             <param-value>classpath:applicationContext.properties</param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>

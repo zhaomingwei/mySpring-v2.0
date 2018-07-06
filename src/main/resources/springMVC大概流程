@@ -1,0 +1,93 @@
+第一阶段（配置阶段）：
+1、web.xml：
+配置一个DispatchServlet，springMVC入口；
+配置init-param：固定属性名称为contextConfigLocation，值一般为：classpath：applicationContext-*.xml
+配置servlet-pattern：通常配置/*，可能会配置其他的
+
+
+第二阶段（初始化阶段）：
+1、实例化ApplicationContextAware，然后调用onRefresh()方法
+2、到DispatchServlet里的initStrategies()方法，初始化九大组件
+分别为：
+initMultipartResolver(context);//文件上传解析，如果请求类型是multipart将通过MultipartResolver进行文件上传解析
+initLocaleResolver(context);//本地化解析
+initThemeResolver(context);//主题解析
+initHandlerMappings(context);//通过HandlerMapping，将请求映射到处理器上
+initHandlerAdapters(context);//通过HandlerAdapter进行多类型参数动态匹配
+initHandlerExceptionResolvers(context);//如果执行过程中遇到异常
+initRequestToViewNameTranslator(context);//直接解析请求到视图名
+initViewResolvers(context);//通过ViewResolvers解析逻辑视图到具体视图实现
+initFlashMapManager(context);//flash映射管理器
+
+自己重写方法：
+
+initHandlerMappings(context)：url与方法名匹配
+先从IOC容器中获取所有beanDefinitionNames，然后遍历，根据beanName获取该代理对象，
+利用反射获取该类类型，在判断该类上有没有Controller注解，如果有在判断该类上
+有没有RequestMapping注解，如果有取出该RequestMapping值；利用反射获取该类所有public
+方法，遍历所有方法判断有没有RequestMapping注解，然后组装请求url(利用正则匹配)和
+对应的方法关系存入list中。
+
+initHandlerAdapters(context)：把参数按名称与下标的顺序丢进map里
+命名参数，非命名参数处理
+
+initViewResolvers(context)
+从配置文件中取出模板文件的根目录，
+
+第三阶段（请求处理阶段）：
+1、浏览器发送请求，spring会自动调用doService()，doService经过一系列处理后，最终调用doDispatch();
+2、// 1.检查是否是文件上传的请求
+processedRequest = checkMultipart(request);
+multipartRequestParsed = (processedRequest != request);
+
+// Determine handler for the current request.
+// 2.取得处理当前请求的controller,这里也称为hanlder,处理器,
+// 	 第一个步骤的意义就在这里体现了.这里并不是直接返回controller,
+//	 而是返回的HandlerExecutionChain请求处理器链对象,
+//	 该对象封装了handler和interceptors.
+mappedHandler = getHandler(processedRequest);
+// 如果handler为空,则返回404
+if (mappedHandler == null) {
+    noHandlerFound(processedRequest, response);
+    return;
+}
+
+// Determine handler adapter for the current request.
+//3. 获取处理request的处理器适配器handler adapter
+HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+
+// Process last-modified header, if supported by the handler.
+// 处理 last-modified 请求头
+String method = request.getMethod();
+boolean isGet = "GET".equals(method);
+if (isGet || "HEAD".equals(method)) {
+    long lastModified = ha.getLastModified(request, mappedHandler.getHandler());
+    if (logger.isDebugEnabled()) {
+        logger.debug("Last-Modified value for [" + getRequestUri(request) + "] is: " + lastModified);
+    }
+    if (new ServletWebRequest(request, response).checkNotModified(lastModified) && isGet) {
+        return;
+    }
+}
+
+if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+    return;
+}
+
+// Actually invoke the handler.
+// 4.实际的处理器处理请求,返回结果视图对象
+mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+if (asyncManager.isConcurrentHandlingStarted()) {
+    return;
+}
+
+// 结果视图对象的处理
+applyDefaultViewName(processedRequest, mv);
+mappedHandler.applyPostHandle(processedRequest, response, mv);
+
+
+processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+
+-->render()-->resolveViewName() 获取一个ModelAndView对象
+

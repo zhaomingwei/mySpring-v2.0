@@ -53,8 +53,7 @@ public class BeanDefinitionReader {
             if(file.isDirectory()){
                 doScanner(packageName + "." + file.getName());
             }else{
-                //上面由于递归的方法第一句就是替换.
-                //这里为何要点来拼接？
+                //上面由于递归的方法第一句就是替换
                 registerBeanClasses.add(packageName + "." + file.getName().replace(".class", ""));
             }
         }
@@ -74,6 +73,10 @@ public class BeanDefinitionReader {
             return beanDefinition;
         }
         return null;
+    }
+
+    public Properties getConfig(){
+        return config;
     }
 
     /**

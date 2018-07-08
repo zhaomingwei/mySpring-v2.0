@@ -3,6 +3,7 @@ package com.zw.springframework.webmvc.servlet;
 import com.zw.springframework.annotation.Controller;
 import com.zw.springframework.annotation.RequestMapping;
 import com.zw.springframework.annotation.RequestParam;
+import com.zw.springframework.aop.AopProxyUtils;
 import com.zw.springframework.context.ClassPathXmlApplicationContext;
 import com.zw.springframework.webmvc.HandlerAdapter;
 import com.zw.springframework.webmvc.HandlerMapping;
@@ -113,11 +114,15 @@ public class DispatcherServlet extends HttpServlet {
         //相当于把IOC容器初始化了
         ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(config.getInitParameter(DEFAULT_CONFIG_LOCATION));
 
-        initStrategies(ctx);
-        
+        try {
+            initStrategies(ctx);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
-    private void initStrategies(ClassPathXmlApplicationContext context) {
+    private void initStrategies(ClassPathXmlApplicationContext context) throws Exception {
         //有九种策略
         // 针对于每个用户请求，都会经过一些处理的策略之后，最终才能有结果输出
         // 每种策略可以自定义干预，但是最终的结果都是一致
@@ -136,15 +141,16 @@ public class DispatcherServlet extends HttpServlet {
 
 
     //此方法是把Controller中配置的RequestMapping和Method对应
-    private void initHandlerMappings(ClassPathXmlApplicationContext context) {
+    private void initHandlerMappings(ClassPathXmlApplicationContext context) throws Exception {
         //处理请求的url
         //通常我们理解是一个map容器维护请求的url和对应的方法
         //map.put(url, Method);
         String[] beanNames = context.getBeanDefinitionNames();
 
         for(String beanName : beanNames){
-            Object obj = context.getBean(beanName);
-            Class<?> clazz = obj.getClass();
+            Object proxy = context.getBean(beanName);
+            Object controller = AopProxyUtils.getTargetObject(proxy);
+            Class<?> clazz = controller.getClass();
             //如果不是Controller注解则跳过
             if(!clazz.isAnnotationPresent(Controller.class)){
                 continue;
@@ -164,7 +170,7 @@ public class DispatcherServlet extends HttpServlet {
                 RequestMapping requestMapping = method.getAnnotation(RequestMapping.class);
                 String regex = ("/" + baseUrl + requestMapping.value().replaceAll("\\*", ".*").replaceAll("/+", "/"));
                 Pattern pattern = Pattern.compile(regex);
-                this.handlerMappings.add(new HandlerMapping(obj, method, pattern));
+                this.handlerMappings.add(new HandlerMapping(controller, method, pattern));
             }
         }
     }

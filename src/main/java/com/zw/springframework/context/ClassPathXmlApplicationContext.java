@@ -3,6 +3,7 @@ package com.zw.springframework.context;
 import com.zw.springframework.annotation.Autowired;
 import com.zw.springframework.annotation.Controller;
 import com.zw.springframework.annotation.Service;
+import com.zw.springframework.aop.AopConfig;
 import com.zw.springframework.beans.BeanDefinition;
 import com.zw.springframework.beans.BeanWrapper;
 import com.zw.springframework.context.support.BeanDefinitionReader;
@@ -10,11 +11,14 @@ import com.zw.springframework.core.BeanFactory;
 import com.zw.springframework.util.Assert;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ClassPathXmlApplicationContext extends AbstractApplicationContext implements BeanFactory {
 
@@ -179,20 +183,43 @@ public class ClassPathXmlApplicationContext extends AbstractApplicationContext i
 
     public Object getBean(String beanName) {
         BeanDefinition beanDefinition = this.beanDefinitionMap.get(beanName);
-        String className = beanDefinition.getBeanClassName();
         try{
             Object instance = instantionBean(beanDefinition);
             if(null==instance){
                 return null;
             }
             BeanWrapper beanWrapper = new BeanWrapper(instance);
-            beanWrapperMap.put(className, beanWrapper);
+            beanWrapper.setAopConfig(instantionAopConfig(beanDefinition));
+            beanWrapperMap.put(beanName, beanWrapper);
             //返回的这个WrapperInstance是我们通过动态代理后的对象
-            return beanWrapperMap.get(className).getWrapperInstance();
+            return beanWrapperMap.get(beanName).getWrapperInstance();
         }catch (Exception e){
             e.printStackTrace();
         }
         return null;
+    }
+
+    private AopConfig instantionAopConfig(BeanDefinition beanDefinition) throws  Exception{
+        AopConfig config = new AopConfig();
+        String expression = reader.getConfig().getProperty("pointCut");
+        String[] before = reader.getConfig().getProperty("aspectBefore").split("\\s");
+        String[] after = reader.getConfig().getProperty("aspectAfter").split("\\s");
+
+        String className = beanDefinition.getBeanClassName();
+        Class<?> clazz = Class.forName(className);
+        Pattern pattern = Pattern.compile(expression);
+        Class aspectClass = Class.forName(before[0]);
+        //在这里得到的方法都是原生的方法
+        for (Method m : clazz.getMethods()){
+            //public .* com\.gupaoedu\.vip\.spring\.demo\.service\..*Service\..*\(.*\)
+            //public java.lang.String com.gupaoedu.vip.spring.demo.service.impl.ModifyService.add(java.lang.String,java.lang.String)
+            Matcher matcher = pattern.matcher(m.toString());
+            if(matcher.matches()){
+                //能满足切面规则的类，添加的AOP配置中
+                config.put(m,aspectClass.newInstance(),new Method[]{aspectClass.getMethod(before[1]),aspectClass.getMethod(after[1])});
+            }
+        }
+        return  config;
     }
 
     private Object instantionBean(BeanDefinition beanDefinition) {

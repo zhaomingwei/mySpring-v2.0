@@ -1,6 +1,11 @@
 package com.zw.springframework.beans;
 
+import com.zw.springframework.aop.AopConfig;
+import com.zw.springframework.aop.AopProxy;
+
 public class BeanWrapper {
+
+    AopProxy aopProxy = new AopProxy();
 
     //包装原始对象后的对象
     private Object wrapperInstance;
@@ -18,7 +23,11 @@ public class BeanWrapper {
 
     public BeanWrapper(Object instance) {
         //这里可以用动态代理来包装，目前还没包装
-        this.wrapperInstance = instance;
+        this.wrapperInstance = aopProxy.getProxy(instance);
         this.originalInstance = instance;
+    }
+
+    public void setAopConfig(AopConfig config){
+        aopProxy.setAopConfig(config);
     }
 }
